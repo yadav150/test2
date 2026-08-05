@@ -1,22 +1,56 @@
+import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Mail, Phone, GraduationCap, Calendar } from 'lucide-react'
-
-// Placeholder — will be replaced by a Firestore doc lookup via studentId
-const placeholderStudent = {
-  id: '1',
-  name: 'Aarav Sharma',
-  class: '6',
-  section: 'A',
-  rollNo: 12,
-  admissionDate: '2023-06-01',
-  parentContact: '—',
-  parentEmail: '—',
-  active: true,
-}
+import { getStudent } from './studentService.js'
+import { db } from '../../firebase/config.js'
+import { collection, query, where, getDocs } from 'firebase/firestore'
+import { getAccountHistory, computeBalance } from '../../shared/ledger/computeBalance.js'
 
 function StudentProfile() {
   const { studentId } = useParams()
-  const student = placeholderStudent // will use studentId to fetch real doc later
+  const [student, setStudent] = useState(null)
+  const [transactions, setTransactions] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      const studentData = await getStudent(studentId)
+      setStudent(studentData)
+
+      // Fetch this student's fee transactions from the shared ledger
+      const txRef = collection(db, 'transactions')
+      const q = query(
+        txRef,
+        where('accountId', '==', studentId),
+        where('accountType', '==', 'student')
+      )
+      const snapshot = await getDocs(q)
+      setTransactions(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })))
+
+      setLoading(false)
+    }
+    load()
+  }, [studentId])
+
+  if (loading) {
+    return <div className="text-sm text-gray-400">Loading student...</div>
+  }
+
+  if (!student) {
+    return (
+      <div className="space-y-4">
+        <Link to="/students" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700">
+          <ArrowLeft className="w-4 h-4" />
+          Back to Students
+        </Link>
+        <p className="text-sm text-gray-500">Student not found.</p>
+      </div>
+    )
+  }
+
+  const history = getAccountHistory(transactions, studentId)
+  const balance = computeBalance(transactions, studentId)
 
   return (
     <div className="space-y-6">
@@ -32,7 +66,7 @@ function StudentProfile() {
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full bg-primary-50 text-primary-700 flex items-center justify-center text-xl font-semibold">
-              {student.name.split(' ').map((n) => n[0]).join('')}
+              {student.name?.split(' ').map((n) => n[0]).join('')}
             </div>
             <div>
               <h2 className="text-xl font-semibold text-gray-900">{student.name}</h2>
@@ -53,7 +87,7 @@ function StudentProfile() {
             </div>
             <div>
               <p className="text-xs text-gray-400">Admission Date</p>
-              <p className="text-sm font-medium text-gray-800">{student.admissionDate}</p>
+              <p className="text-sm font-medium text-gray-800">{student.createdAt?.split('T')[0] || '—'}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -62,7 +96,7 @@ function StudentProfile() {
             </div>
             <div>
               <p className="text-xs text-gray-400">Parent Contact</p>
-              <p className="text-sm font-medium text-gray-800">{student.parentContact}</p>
+              <p className="text-sm font-medium text-gray-800">{student.parentContact || '—'}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -71,7 +105,7 @@ function StudentProfile() {
             </div>
             <div>
               <p className="text-xs text-gray-400">Parent Email</p>
-              <p className="text-sm font-medium text-gray-800">{student.parentEmail}</p>
+              <p className="text-sm font-medium text-gray-800">{student.parentEmail || '—'}</p>
             </div>
           </div>
         </div>
@@ -84,16 +118,33 @@ function StudentProfile() {
             Attendance Summary
           </h3>
           <p className="text-sm text-gray-400">
-            Will populate once connected to attendance records.
+            Will populate once Attendance module is connected.
           </p>
         </div>
         <div className="card p-6">
-          <h3 className="text-sm font-medium text-gray-500 flex items-center gap-2 mb-3">
-            Fee Ledger
-          </h3>
-          <p className="text-sm text-gray-400">
-            Will populate once connected to fee transactions.
-          </p>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-medium text-gray-500">Fee Ledger</h3>
+            <span className="text-sm font-semibold text-gray-900">
+              ₹{balance.toLocaleString('en-IN')} due
+            </span>
+          </div>
+          {history.length === 0 ? (
+            <p className="text-sm text-gray-400">No transactions yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {history.map((t) => (
+                <div key={t.id} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0">
+                  <div>
+                    <p className="text-gray-700">{t.type?.replace('_', ' ')}</p>
+                    <p className="text-xs text-gray-400">{t.date}</p>
+                  </div>
+                  <span className={t.direction === 'credit' ? 'text-amber-600' : 'text-emerald-600'}>
+                    {t.direction === 'credit' ? '+' : '−'}₹{t.amount?.toLocaleString('en-IN')}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
