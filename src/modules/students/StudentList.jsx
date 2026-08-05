@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Pencil, Trash2 } from 'lucide-react'
 import StudentForm from './StudentForm.jsx'
 
@@ -13,6 +14,7 @@ function StudentList() {
   const [search, setSearch] = useState('')
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingStudent, setEditingStudent] = useState(null)
+  const navigate = useNavigate()
 
   const filtered = placeholderStudents.filter((s) =>
     s.name.toLowerCase().includes(search.toLowerCase())
@@ -76,7 +78,11 @@ function StudentList() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filtered.map((s) => (
-              <tr key={s.id} className="hover:bg-gray-50">
+              <tr
+                key={s.id}
+                onClick={() => navigate(`/students/${s.id}`)}
+                className="hover:bg-gray-50 cursor-pointer"
+              >
                 <td className="px-5 py-3 font-medium text-gray-900">{s.name}</td>
                 <td className="px-5 py-3 text-gray-600">{s.class}</td>
                 <td className="px-5 py-3 text-gray-600">{s.section}</td>
@@ -90,12 +96,18 @@ function StudentList() {
                 <td className="px-5 py-3">
                   <div className="flex items-center justify-end gap-2">
                     <button
-                      onClick={() => openEditForm(s)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openEditForm(s)
+                      }}
                       className="p-1.5 text-gray-400 hover:text-primary-600 rounded"
                     >
                       <Pencil className="w-4 h-4" />
                     </button>
-                    <button className="p-1.5 text-gray-400 hover:text-red-600 rounded">
+                    <button
+                      onClick={(e) => e.stopPropagation()}
+                      className="p-1.5 text-gray-400 hover:text-red-600 rounded"
+                    >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
