@@ -1,24 +1,10 @@
+import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Phone, Briefcase, Wallet } from 'lucide-react'
+import { getStaffMember } from './staffService.js'
+import { db } from '../../firebase/config.js'
+import { collection, query, where, getDocs } from 'firebase/firestore'
 import { getAccountHistory, computeBalance } from '../../shared/ledger/computeBalance.js'
-
-// Placeholder — will be replaced by a Firestore doc lookup via staffId
-const placeholderStaffMember = {
-  id: '1',
-  name: 'Meera Iyer',
-  role: 'Teacher',
-  subjectsOrCharge: 'Mathematics, Class 6-8',
-  contact: '—',
-  monthlySalary: '—',
-  active: true,
-}
-
-// Same placeholder ledger as PayrollLedger.jsx — in backend phase this
-// becomes a Firestore query filtered by accountId instead of a shared array.
-const placeholderTransactions = [
-  { id: 'p1', accountId: '1', type: 'salary_payable', amount: 25000, direction: 'credit', date: '2026-07-01' },
-  { id: 'p2', accountId: '1', type: 'salary_payout', amount: 25000, direction: 'debit', date: '2026-07-05' },
-]
 
 const roleColors = {
   Teacher: 'bg-primary-50 text-primary-700',
@@ -28,9 +14,48 @@ const roleColors = {
 
 function StaffProfile() {
   const { staffId } = useParams()
-  const staff = placeholderStaffMember // will use staffId to fetch real doc later
-  const history = getAccountHistory(placeholderTransactions, staff.id)
-  const balance = computeBalance(placeholderTransactions, staff.id)
+  const [staff, setStaff] = useState(null)
+  const [transactions, setTransactions] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      const staffData = await getStaffMember(staffId)
+      setStaff(staffData)
+
+      const txRef = collection(db, 'transactions')
+      const q = query(
+        txRef,
+        where('accountId', '==', staffId),
+        where('accountType', '==', 'staff')
+      )
+      const snapshot = await getDocs(q)
+      setTransactions(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })))
+
+      setLoading(false)
+    }
+    load()
+  }, [staffId])
+
+  if (loading) {
+    return <div className="text-sm text-gray-400">Loading staff member...</div>
+  }
+
+  if (!staff) {
+    return (
+      <div className="space-y-4">
+        <Link to="/staff" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700">
+          <ArrowLeft className="w-4 h-4" />
+          Back to Staff
+        </Link>
+        <p className="text-sm text-gray-500">Staff member not found.</p>
+      </div>
+    )
+  }
+
+  const history = getAccountHistory(transactions, staffId)
+  const balance = computeBalance(transactions, staffId)
 
   return (
     <div className="space-y-6">
@@ -46,7 +71,7 @@ function StaffProfile() {
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full bg-primary-50 text-primary-700 flex items-center justify-center text-xl font-semibold">
-              {staff.name.split(' ').map((n) => n[0]).join('')}
+              {staff.name?.split(' ').map((n) => n[0]).join('')}
             </div>
             <div>
               <h2 className="text-xl font-semibold text-gray-900">{staff.name}</h2>
@@ -67,7 +92,7 @@ function StaffProfile() {
             </div>
             <div>
               <p className="text-xs text-gray-400">Subject / Charge</p>
-              <p className="text-sm font-medium text-gray-800">{staff.subjectsOrCharge}</p>
+              <p className="text-sm font-medium text-gray-800">{staff.subjectsOrCharge || '—'}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -76,7 +101,7 @@ function StaffProfile() {
             </div>
             <div>
               <p className="text-xs text-gray-400">Contact</p>
-              <p className="text-sm font-medium text-gray-800">{staff.contact}</p>
+              <p className="text-sm font-medium text-gray-800">{staff.contact || '—'}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -85,7 +110,9 @@ function StaffProfile() {
             </div>
             <div>
               <p className="text-xs text-gray-400">Monthly Salary</p>
-              <p className="text-sm font-medium text-gray-800">{staff.monthlySalary}</p>
+              <p className="text-sm font-medium text-gray-800">
+                {staff.monthlySalary ? `₹${Number(staff.monthlySalary).toLocaleString('en-IN')}` : '—'}
+              </p>
             </div>
           </div>
         </div>
@@ -105,11 +132,11 @@ function StaffProfile() {
             {history.map((t) => (
               <div key={t.id} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0">
                 <div>
-                  <p className="text-gray-700">{t.type.replace('_', ' ')}</p>
+                  <p className="text-gray-700">{t.type?.replace('_', ' ')}</p>
                   <p className="text-xs text-gray-400">{t.date}</p>
                 </div>
                 <span className={t.direction === 'credit' ? 'text-amber-600' : 'text-emerald-600'}>
-                  {t.direction === 'credit' ? '+' : '−'}₹{t.amount.toLocaleString('en-IN')}
+                  {t.direction === 'credit' ? '+' : '−'}₹{t.amount?.toLocaleString('en-IN')}
                 </span>
               </div>
             ))}
