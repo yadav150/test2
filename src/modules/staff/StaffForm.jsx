@@ -1,11 +1,73 @@
+import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
+import { addStaffMember, updateStaffMember } from './staffService.js'
 
 const roles = ['Teacher', 'Accountant', 'Admin']
 
-function StaffForm({ isOpen, onClose, initialData = null }) {
-  if (!isOpen) return null
+const emptyForm = {
+  name: '',
+  role: '',
+  subjectsOrCharge: '',
+  contact: '',
+  monthlySalary: '',
+}
+
+function StaffForm({ isOpen, onClose, onSaved, initialData = null }) {
+  const [formData, setFormData] = useState(emptyForm)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   const isEdit = Boolean(initialData)
+
+  useEffect(() => {
+    if (isOpen) {
+      setFormData(
+        initialData
+          ? {
+              name: initialData.name || '',
+              role: initialData.role || '',
+              subjectsOrCharge: initialData.subjectsOrCharge || '',
+              contact: initialData.contact || '',
+              monthlySalary: initialData.monthlySalary || '',
+            }
+          : emptyForm
+      )
+      setError('')
+    }
+  }, [isOpen, initialData])
+
+  if (!isOpen) return null
+
+  const handleChange = (field) => (e) => {
+    setFormData((prev) => ({ ...prev, [field]: e.target.value }))
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!formData.name.trim()) {
+      setError('Name is required.')
+      return
+    }
+    if (!formData.role) {
+      setError('Please select a role.')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      if (isEdit) {
+        await updateStaffMember(initialData.id, formData)
+      } else {
+        await addStaffMember(formData)
+      }
+      onSaved()
+    } catch (err) {
+      setError('Something went wrong saving this staff member. Please try again.')
+      console.error(err)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
@@ -19,16 +81,24 @@ function StaffForm({ isOpen, onClose, initialData = null }) {
           </button>
         </div>
 
-        <form className="px-6 py-5 space-y-4">
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+          {error && (
+            <div className="bg-red-50 text-red-700 text-sm px-3 py-2 rounded-lg">
+              {error}
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Full Name
             </label>
             <input
               type="text"
-              defaultValue={initialData?.name}
+              value={formData.name}
+              onChange={handleChange('name')}
               className="input-field"
               placeholder="e.g. Meera Iyer"
+              required
             />
           </div>
 
@@ -37,8 +107,10 @@ function StaffForm({ isOpen, onClose, initialData = null }) {
               Role
             </label>
             <select
-              defaultValue={initialData?.role || ''}
+              value={formData.role}
+              onChange={handleChange('role')}
               className="input-field"
+              required
             >
               <option value="" disabled>Select role</option>
               {roles.map((r) => (
@@ -53,7 +125,8 @@ function StaffForm({ isOpen, onClose, initialData = null }) {
             </label>
             <input
               type="text"
-              defaultValue={initialData?.subjectsOrCharge}
+              value={formData.subjectsOrCharge}
+              onChange={handleChange('subjectsOrCharge')}
               className="input-field"
               placeholder="e.g. Mathematics, Class 6-8"
             />
@@ -65,7 +138,8 @@ function StaffForm({ isOpen, onClose, initialData = null }) {
             </label>
             <input
               type="text"
-              defaultValue={initialData?.contact}
+              value={formData.contact}
+              onChange={handleChange('contact')}
               className="input-field"
               placeholder="Phone or email"
             />
@@ -77,18 +151,19 @@ function StaffForm({ isOpen, onClose, initialData = null }) {
             </label>
             <input
               type="number"
-              defaultValue={initialData?.monthlySalary}
+              value={formData.monthlySalary}
+              onChange={handleChange('monthlySalary')}
               className="input-field"
               placeholder="e.g. 25000"
             />
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="btn-secondary">
+            <button type="button" onClick={onClose} className="btn-secondary" disabled={saving}>
               Cancel
             </button>
-            <button type="submit" className="btn-primary">
-              {isEdit ? 'Save Changes' : 'Add Staff'}
+            <button type="submit" className="btn-primary" disabled={saving}>
+              {saving ? 'Saving...' : isEdit ? 'Save Changes' : 'Add Staff'}
             </button>
           </div>
         </form>
