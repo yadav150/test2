@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Plus, Search, Pencil, Trash2 } from 'lucide-react'
+import StudentForm from './StudentForm.jsx'
 
 // Placeholder data — will be replaced by Firestore query in backend phase
 const placeholderStudents = [
@@ -10,10 +11,27 @@ const placeholderStudents = [
 
 function StudentList() {
   const [search, setSearch] = useState('')
+  const [isFormOpen, setIsFormOpen] = useState(false)
+  const [editingStudent, setEditingStudent] = useState(null)
 
   const filtered = placeholderStudents.filter((s) =>
     s.name.toLowerCase().includes(search.toLowerCase())
   )
+
+  const openAddForm = () => {
+    setEditingStudent(null)
+    setIsFormOpen(true)
+  }
+
+  const openEditForm = (student) => {
+    setEditingStudent(student)
+    setIsFormOpen(true)
+  }
+
+  const closeForm = () => {
+    setIsFormOpen(false)
+    setEditingStudent(null)
+  }
 
   return (
     <div className="space-y-6">
@@ -24,7 +42,7 @@ function StudentList() {
             {placeholderStudents.length} students enrolled
           </p>
         </div>
-        <button className="btn-primary flex items-center gap-2">
+        <button onClick={openAddForm} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           Add Student
         </button>
@@ -71,7 +89,10 @@ function StudentList() {
                 </td>
                 <td className="px-5 py-3">
                   <div className="flex items-center justify-end gap-2">
-                    <button className="p-1.5 text-gray-400 hover:text-primary-600 rounded">
+                    <button
+                      onClick={() => openEditForm(s)}
+                      className="p-1.5 text-gray-400 hover:text-primary-600 rounded"
+                    >
                       <Pencil className="w-4 h-4" />
                     </button>
                     <button className="p-1.5 text-gray-400 hover:text-red-600 rounded">
@@ -84,6 +105,12 @@ function StudentList() {
           </tbody>
         </table>
       </div>
+
+      <StudentForm
+        isOpen={isFormOpen}
+        onClose={closeForm}
+        initialData={editingStudent}
+      />
     </div>
   )
 }
